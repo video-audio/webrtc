@@ -21,6 +21,8 @@ type RTPSender struct {
 	// A reference to the associated api object
 	api *API
 
+	payloadType *uint8
+
 	mu                     sync.RWMutex
 	sendCalled, stopCalled chan interface{}
 }
@@ -148,8 +150,50 @@ func (r *RTPSender) sendRTP(header *rtp.Header, payload []byte) (int, error) {
 			return 0, err
 		}
 
+		if r.payloadType == nil {
+			codecs := r.api.mediaEngine.GetCodecsByName(r.track.codec.Name)
+			if len(codecs) == 0 {
+				return 0, fmt.Errorf("no %s codecs in media engine", r.track.codec.Name)
+			}
+			for _, c := range codecs {
+				if equalCodecs(c, r.track.codec) {
+					r.payloadType = &c.PayloadType
+					break
+				}
+			}
+			if r.payloadType == nil {
+				return 0, fmt.Errorf("could not match %s codec from track to media engine", r.track.codec.Name)
+			}
+		}
+		// Overwrite the payload type in the RTP header.
+		if r.payloadType != nil {
+			header.PayloadType = *r.payloadType
+		}
+
 		return writeStream.WriteRTP(header, payload)
 	}
+}
+
+func equalCodecs(codecA, codecB *RTPCodec) bool {
+	if codecA.Name != codecB.Name {
+		return false
+	}
+	if codecA.Type != codecB.Type {
+		return false
+	}
+	if codecA.SDPFmtpLine != codecB.SDPFmtpLine {
+		return false
+	}
+	if codecA.Channels != codecB.Channels {
+		return false
+	}
+	if codecA.ClockRate != codecB.ClockRate {
+		return false
+	}
+	if codecA.MimeType != codecB.MimeType {
+		return false
+	}
+	return true
 }
 
 // hasSent tells if data has been ever sent for this instance
