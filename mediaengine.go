@@ -9,7 +9,7 @@ import (
 
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
-	"github.com/pion/sdp/v2"
+	"github.com/pion/sdp"
 )
 
 // PayloadTypes for the default codecs
@@ -106,6 +106,16 @@ func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
 		}
 	}
 	return nil
+}
+
+func (m *MediaEngine) GetCodecsByName(codecName string) []*RTPCodec {
+	var codecs []*RTPCodec
+	for _, codec := range m.codecs {
+		if codec.Name == codecName {
+			codecs = append(codecs, codec)
+		}
+	}
+	return codecs
 }
 
 func (m *MediaEngine) getCodec(payloadType uint8) (*RTPCodec, error) {
