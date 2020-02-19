@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/pion/logging"
-	"github.com/pion/sdp/v2"
+	sdp "github.com/pion/sdp/v2"
 )
 
 type trackDetails struct {
@@ -24,8 +24,11 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 	incomingTracks := map[uint32]trackDetails{}
 
 	for _, media := range s.MediaDescriptions {
+		var ssrc_tmp uint32
+		trackID := ""
+		trackLabel := ""
+		codecType := NewRTPCodecType(media.MediaName.Media)
 		for _, attr := range media.Attributes {
-			codecType := NewRTPCodecType(media.MediaName.Media)
 			if codecType == 0 {
 				continue
 			}
@@ -41,15 +44,23 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 					continue // This ssrc is already fully defined
 				}
 
-				trackID := ""
-				trackLabel := ""
 				if len(split) == 3 && strings.HasPrefix(split[1], "msid:") {
 					trackLabel = split[1][len("msid:"):]
 					trackID = split[2]
+					incomingTracks[uint32(ssrc)] = trackDetails{codecType, trackLabel, trackID, uint32(ssrc)}
 				}
-
-				incomingTracks[uint32(ssrc)] = trackDetails{codecType, trackLabel, trackID, uint32(ssrc)}
+				ssrc_tmp = uint32(ssrc)
 			}
+
+			if attr.Key == "msid" {
+				split := strings.Split(attr.Value, " ")
+				trackLabel = split[0]
+				trackID = split[1]
+			}
+
+		}
+		if trackID != "" && trackLabel != "" && ssrc_tmp != 0 {
+			incomingTracks[uint32(ssrc_tmp)] = trackDetails{codecType, trackLabel, trackID, uint32(ssrc_tmp)}
 		}
 	}
 
