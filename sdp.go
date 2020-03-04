@@ -48,6 +48,9 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 					trackLabel = split[1][len("msid:"):]
 					trackID = split[2]
 					incomingTracks[uint32(ssrc)] = trackDetails{codecType, trackLabel, trackID, uint32(ssrc)}
+					if trackID != "" && trackLabel != "" {
+						break // Remote provided Label+ID, we have all the information we need
+					}
 				}
 				ssrc_tmp = uint32(ssrc)
 			}
