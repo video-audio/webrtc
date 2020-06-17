@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/pion/logging"
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
 )
 
@@ -30,13 +29,16 @@ func newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
 }
 
 func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
-	offerChan := make(chan SessionDescription)
-	pcOffer.OnICECandidate(func(candidate *ICECandidate) {
-		if candidate == nil {
-			offerChan <- *pcOffer.PendingLocalDescription()
-		}
-	})
+	iceGatheringState := pcOffer.ICEGatheringState()
+	offerChan := make(chan SessionDescription, 1)
 
+	if iceGatheringState != ICEGatheringStateComplete {
+		pcOffer.OnICECandidate(func(candidate *ICECandidate) {
+			if candidate == nil {
+				offerChan <- *pcOffer.PendingLocalDescription()
+			}
+		})
+	}
 	// Note(albrow): We need to create a data channel in order to trigger ICE
 	// candidate gathering in the background for the JavaScript/Wasm bindings. If
 	// we don't do this, the complete offer including ICE candidates will never be
@@ -53,9 +55,11 @@ func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 		return err
 	}
 
-	timeout := time.After(3 * time.Second)
+	if iceGatheringState == ICEGatheringStateComplete {
+		offerChan <- offer
+	}
 	select {
-	case <-timeout:
+	case <-time.After(3 * time.Second):
 		return fmt.Errorf("timed out waiting to receive offer")
 	case offer := <-offerChan:
 		if err := pcAnswer.SetRemoteDescription(offer); err != nil {
@@ -77,44 +81,6 @@ func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 		}
 		return nil
 	}
-}
-
-// For testing route all messages through one callback
-type testCatchAllLeveledLogger struct {
-	callback func(string)
-}
-
-func (t testCatchAllLeveledLogger) handleMsg(format string, args ...interface{}) {
-	t.callback(fmt.Sprintf(format, args...))
-}
-
-func (t testCatchAllLeveledLogger) Trace(msg string) { t.handleMsg(msg) }
-func (t testCatchAllLeveledLogger) Tracef(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
-}
-func (t testCatchAllLeveledLogger) Debug(msg string) { t.handleMsg(msg) }
-func (t testCatchAllLeveledLogger) Debugf(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
-}
-func (t testCatchAllLeveledLogger) Info(msg string) { t.handleMsg(msg) }
-func (t testCatchAllLeveledLogger) Infof(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
-}
-func (t testCatchAllLeveledLogger) Warn(msg string) { t.handleMsg(msg) }
-func (t testCatchAllLeveledLogger) Warnf(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
-}
-func (t testCatchAllLeveledLogger) Error(msg string) { t.handleMsg(msg) }
-func (t testCatchAllLeveledLogger) Errorf(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
-}
-
-type testCatchAllLoggerFactory struct {
-	callback func(string)
-}
-
-func (t testCatchAllLoggerFactory) NewLogger(_ string) logging.LeveledLogger {
-	return testCatchAllLeveledLogger(t)
 }
 
 func TestNew(t *testing.T) {
@@ -279,7 +245,7 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 	assert.Equal(t, expected.BundlePolicy, actual.BundlePolicy)
 	assert.Equal(t, expected.RTCPMuxPolicy, actual.RTCPMuxPolicy)
 	// TODO(albrow): Uncomment this after #513 is fixed.
-	// See: https://github.com/pion/webrtc/v2/issues/513.
+	// See: https://github.com/pion/webrtc/issues/513.
 	// assert.Equal(t, len(expected.Certificates), len(actual.Certificates))
 	assert.Equal(t, expected.ICECandidatePoolSize, actual.ICECandidatePoolSize)
 }

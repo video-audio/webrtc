@@ -6,11 +6,11 @@ This could serve as the building block to building conferencing software, and ot
 ## Instructions
 ### Download broadcast
 ```
-go get github.com/pion/webrtc/examples/broadcast
+go get github.com/pion/webrtc/v2/examples/broadcast
 ```
 
 ### Open broadcast example page
-[jsfiddle.net](https://jsfiddle.net/zhpya3n9/) You should see two buttons 'Publish a Broadcast' and 'Join a Broadcast'
+[jsfiddle.net](https://jsfiddle.net/d2mt13y6/) You should see two buttons 'Publish a Broadcast' and 'Join a Broadcast'
 
 ### Run Broadcast
 #### Linux/macOS

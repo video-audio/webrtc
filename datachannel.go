@@ -152,12 +152,10 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 	}
 
 	if d.id == nil {
-		generatedID, err := d.sctpTransport.generateDataChannelID(d.sctpTransport.dtlsTransport.role())
+		err := d.sctpTransport.generateAndSetDataChannelID(d.sctpTransport.dtlsTransport.role(), &d.id)
 		if err != nil {
 			return err
 		}
-
-		d.id = &generatedID
 	}
 
 	dc, err := datachannel.Dial(d.sctpTransport.association, *d.id, cfg)
@@ -337,10 +335,6 @@ func (d *DataChannel) Send(data []byte) error {
 		return err
 	}
 
-	if len(data) == 0 {
-		data = []byte{0}
-	}
-
 	_, err = d.dataChannel.WriteDataChannel(data, false)
 	return err
 }
@@ -352,12 +346,7 @@ func (d *DataChannel) SendText(s string) error {
 		return err
 	}
 
-	data := []byte(s)
-	if len(data) == 0 {
-		data = []byte{0}
-	}
-
-	_, err = d.dataChannel.WriteDataChannel(data, true)
+	_, err = d.dataChannel.WriteDataChannel([]byte(s), true)
 	return err
 }
 

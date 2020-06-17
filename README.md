@@ -9,6 +9,7 @@
   <a href="https://pion.ly"><img src="https://img.shields.io/badge/pion-webrtc-gray.svg?longCache=true&colorB=brightgreen" alt="Pion webrtc"></a>
   <a href="https://sourcegraph.com/github.com/pion/webrtc?badge"><img src="https://sourcegraph.com/github.com/pion/webrtc/-/badge.svg" alt="Sourcegraph Widget"></a>
   <a href="https://pion.ly/slack"><img src="https://img.shields.io/badge/join-us%20on%20slack-gray.svg?longCache=true&logo=slack&colorB=brightgreen" alt="Slack Widget"></a>
+  <a href="https://twitter.com/_pion?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40_pion&style=social&url=https%3A%2F%2Ftwitter.com%2F_pion" alt="Twitter Widget"></a>
   <a href="https://github.com/pion/awesome-pion" alt="Awesome Pion"><img src="https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg"></a>
   <br>
   <a href="https://travis-ci.org/pion/webrtc"><img src="https://travis-ci.org/pion/webrtc.svg?branch=master" alt="Build Status"></a>
@@ -138,6 +139,29 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Luke S](https://github.com/encounter)
 * [Hendrik Hofstadt](https://github.com/hendrikhofstadt)
 * [Clayton McCray](https://github.com/ClaytonMcCray)
+* [lawl](https://github.com/lawl)
+* [Jorropo](https://github.com/Jorropo)
+* [Akil](https://github.com/akilude)
+* [Quentin Renard](https://github.com/asticode)
+* [opennota](https://github.com/opennota)
+* [Simon Eisenmann](https://github.com/longsleep)
+* [Ben Weitzman](https://github.com/benweitzman)
+* [Masahiro Nakamura](https://github.com/tsuu32)
+* [Tarrence van As](https://github.com/tarrencev)
+* [Yuki Igarashi](https://github.com/bonprosoft)
+* [Egon Elbre](https://github.com/egonelbre)
+* [Jerko Steiner](https://github.com/jeremija)
+* [Roman Romanenko](https://github.com/r-novel)
+* [YongXin SHI](https://github.com/a-wing)
+* [Magnus Wahlstrand](https://github.com/kyeett)
+* [Chad Retz](https://github.com/cretz)
+* [Simone Gotti](https://github.com/sgotti)
+* [Cedric Fung](https://github.com/cedricfung)
+* [Norman Rasmussen](https://github.com/normanr) - *Fix Empty DataChannel messages*
+* [salmān aljammāz](https://github.com/saljam)
+* [cnderrauber](https://github.com/cnderrauber)
+* [Juliusz Chroboczek](https://github.com/jech)
+* [John Berthels](https://github.com/jbert)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

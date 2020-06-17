@@ -18,19 +18,20 @@ import (
 
 	"github.com/pion/ice"
 	"github.com/pion/transport/test"
+	"github.com/pion/webrtc/v2/internal/util"
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
 
 // newPair creates two new peer connections (an offerer and an answerer) using
 // the api.
-func (api *API) newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
-	pca, err := api.NewPeerConnection(Configuration{})
+func (api *API) newPair(cfg Configuration) (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
+	pca, err := api.NewPeerConnection(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pcb, err := api.NewPeerConnection(Configuration{})
+	pcb, err := api.NewPeerConnection(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -121,6 +122,34 @@ func TestNew_Go(t *testing.T) {
 				assert.NoError(t, pc.Close())
 			}
 		}
+	})
+	t.Run("ICEServers_Copy", func(t *testing.T) {
+		const expectedURL = "stun:stun.l.google.com:19302?foo=bar"
+		const expectedUsername = "username"
+		const expectedPassword = "password"
+
+		cfg := Configuration{
+			ICEServers: []ICEServer{
+				{
+					URLs:       []string{expectedURL},
+					Username:   expectedUsername,
+					Credential: expectedPassword,
+				},
+			},
+		}
+		pc, err := api.NewPeerConnection(cfg)
+		assert.NoError(t, err)
+		assert.NotNil(t, pc)
+
+		pc.configuration.ICEServers[0].Username = util.RandSeq(15)
+		pc.configuration.ICEServers[0].Credential = util.RandSeq(15)
+		pc.configuration.ICEServers[0].URLs[0] = util.RandSeq(15)
+
+		assert.Equal(t, expectedUsername, cfg.ICEServers[0].Username)
+		assert.Equal(t, expectedPassword, cfg.ICEServers[0].Credential)
+		assert.Equal(t, expectedURL, cfg.ICEServers[0].URLs[0])
+
+		assert.NoError(t, pc.Close())
 	})
 }
 
@@ -311,7 +340,7 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	defer report()
 
 	api := NewAPI()
-	offerPC, answerPC, err := api.newPair()
+	offerPC, answerPC, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -403,20 +432,20 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 			[]RTPCodecType{RTPCodecTypeVideo},
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
 			[]*RTPTransceiver{createTransceiver(RTPCodecTypeAudio, RTPTransceiverDirectionSendrecv)},
-			[]*RTPTransceiver{createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive)},
+			[]*RTPTransceiver{nil},
 		},
 		{
-			"No local Transceivers, every remote should get an inactive",
+			"No local Transceivers, every remote should get nil",
 			[]RTPCodecType{RTPCodecTypeVideo, RTPCodecTypeAudio, RTPCodecTypeVideo, RTPCodecTypeVideo},
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendonly, RTPTransceiverDirectionInactive},
 
 			[]*RTPTransceiver{},
 
 			[]*RTPTransceiver{
-				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive),
-				createTransceiver(RTPCodecTypeAudio, RTPTransceiverDirectionInactive),
-				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive),
-				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive),
+				nil,
+				nil,
+				nil,
+				nil,
 			},
 		},
 		{
@@ -475,16 +504,16 @@ func TestOneAttrKeyConnectionSetupPerMediaDescriptionInSDP(t *testing.T) {
 	pc, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	_, err = pc.AddTransceiver(RTPCodecTypeVideo)
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
-	_, err = pc.AddTransceiver(RTPCodecTypeAudio)
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeAudio)
 	assert.NoError(t, err)
 
-	_, err = pc.AddTransceiver(RTPCodecTypeAudio)
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeAudio)
 	assert.NoError(t, err)
 
-	_, err = pc.AddTransceiver(RTPCodecTypeVideo)
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
 	sdp, err := pc.CreateOffer(nil)
@@ -658,14 +687,23 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 	peerConn, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	peerConn.OnICEGatheringStateChange(func(s ICEGathererState) {
+	var onStateChange func(s ICEGathererState)
+	onStateChange = func(s ICEGathererState) {
+		// Access to ICEGatherer in the callback must not cause dead lock.
+		peerConn.OnICEGatheringStateChange(onStateChange)
+		if state := peerConn.iceGatherer.State(); state != s {
+			t.Errorf("State change callback argument (%s) and State() (%s) result differs",
+				s, state,
+			)
+		}
+
 		switch s {
 		case ICEGathererStateClosed:
 			close(seenClosed)
 			return
 		case ICEGathererStateGathering:
 			if seenComplete.get() {
-				t.Fatal("Completed before gathering")
+				t.Error("Completed before gathering")
 			}
 			seenGathering.set(true)
 		case ICEGathererStateComplete:
@@ -675,7 +713,8 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 		if seenGathering.get() && seenComplete.get() {
 			close(seenGatheringAndComplete)
 		}
-	})
+	}
+	peerConn.OnICEGatheringStateChange(onStateChange)
 
 	offer, err := peerConn.CreateOffer(nil)
 	assert.NoError(t, err)
@@ -710,7 +749,7 @@ func TestPeerConnectionTrickle(t *testing.T) {
 	s.SetTrickle(true)
 
 	api := NewAPI(WithSettingEngine(s))
-	offerPC, answerPC, err := api.newPair()
+	offerPC, answerPC, err := api.newPair(Configuration{})
 	assert.NoError(t, err)
 
 	addOrCacheCandidate := func(pc *PeerConnection, c *ICECandidate, candidateCache []ICECandidateInit) []ICECandidateInit {
@@ -722,14 +761,22 @@ func TestPeerConnectionTrickle(t *testing.T) {
 			return append(candidateCache, c.ToJSON())
 		}
 
-		assert.NoError(t, answerPC.AddICECandidate(c.ToJSON()))
+		assert.NoError(t, pc.AddICECandidate(c.ToJSON()))
 		return candidateCache
 	}
 
 	candidateLock := sync.RWMutex{}
+	var offerCandidateDone, answerCandidateDone bool
 
 	cachedOfferCandidates := []ICECandidateInit{}
 	offerPC.OnICECandidate(func(c *ICECandidate) {
+		if offerCandidateDone {
+			t.Error("Received OnICECandidate after finishing gathering")
+		}
+		if c == nil {
+			offerCandidateDone = true
+		}
+
 		candidateLock.Lock()
 		defer candidateLock.Unlock()
 
@@ -738,6 +785,13 @@ func TestPeerConnectionTrickle(t *testing.T) {
 
 	cachedAnswerCandidates := []ICECandidateInit{}
 	answerPC.OnICECandidate(func(c *ICECandidate) {
+		if answerCandidateDone {
+			t.Error("Received OnICECandidate after finishing gathering")
+		}
+		if c == nil {
+			answerCandidateDone = true
+		}
+
 		candidateLock.Lock()
 		defer candidateLock.Unlock()
 
@@ -783,4 +837,46 @@ func TestPeerConnectionTrickle(t *testing.T) {
 	<-offerPCConnected.Done()
 	assert.NoError(t, offerPC.Close())
 	assert.NoError(t, answerPC.Close())
+}
+
+// Issue #1121, assert populateLocalCandidates doesn't mutate
+func TestPopulateLocalCandidates(t *testing.T) {
+	t.Run("PendingLocalDescription shouldn't add extra mutations", func(t *testing.T) {
+		pc, err := NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		offer, err := pc.CreateOffer(nil)
+		assert.NoError(t, err)
+
+		assert.NoError(t, pc.SetLocalDescription(offer))
+		assert.Equal(t, pc.PendingLocalDescription(), pc.PendingLocalDescription())
+		assert.NoError(t, pc.Close())
+	})
+
+	t.Run("end-of-candidates only when gathering is complete", func(t *testing.T) {
+		s := SettingEngine{}
+		s.SetTrickle(true)
+
+		pc, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		gatherComplete, gatherCompleteCancel := context.WithCancel(context.Background())
+		pc.OnICEGatheringStateChange(func(i ICEGathererState) {
+			if i == ICEGathererStateComplete {
+				gatherCompleteCancel()
+			}
+		})
+
+		offer, err := pc.CreateOffer(nil)
+		assert.NoError(t, err)
+		assert.NotContains(t, offer.SDP, "a=candidate")
+		assert.NotContains(t, offer.SDP, "a=end-of-candidates")
+
+		assert.NoError(t, pc.SetLocalDescription(offer))
+		<-gatherComplete.Done()
+		assert.Contains(t, pc.PendingLocalDescription().SDP, "a=candidate")
+		assert.Contains(t, pc.PendingLocalDescription().SDP, "a=end-of-candidates")
+
+		assert.NoError(t, pc.Close())
+	})
 }

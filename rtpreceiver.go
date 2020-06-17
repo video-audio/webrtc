@@ -4,6 +4,7 @@ package webrtc
 
 import (
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/pion/rtcp"
@@ -66,7 +67,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 		return fmt.Errorf("Receive has already been called")
 	default:
 	}
-	close(r.received)
+	defer close(r.received)
 
 	r.track = &Track{
 		kind:     r.kind,
@@ -99,8 +100,12 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 
 // Read reads incoming RTCP for this RTPReceiver
 func (r *RTPReceiver) Read(b []byte) (n int, err error) {
-	<-r.received
-	return r.rtcpReadStream.Read(b)
+	select {
+	case <-r.received:
+		return r.rtcpReadStream.Read(b)
+	case <-r.closed:
+		return 0, io.ErrClosedPipe
+	}
 }
 
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you
@@ -136,11 +141,15 @@ func (r *RTPReceiver) Stop() error {
 
 	select {
 	case <-r.received:
-		if err := r.rtcpReadStream.Close(); err != nil {
-			return err
+		if r.rtcpReadStream != nil {
+			if err := r.rtcpReadStream.Close(); err != nil {
+				return err
+			}
 		}
-		if err := r.rtpReadStream.Close(); err != nil {
-			return err
+		if r.rtpReadStream != nil {
+			if err := r.rtpReadStream.Close(); err != nil {
+				return err
+			}
 		}
 	default:
 	}
