@@ -117,10 +117,12 @@ func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
 	return nil
 }
 
+// GetCodecsByName returns all codecs by name that are supported by m.
+// The returned codecs should not be modified.
 func (m *MediaEngine) GetCodecsByName(codecName string) []*RTPCodec {
 	var codecs []*RTPCodec
 	for _, codec := range m.codecs {
-		if codec.Name == codecName {
+		if strings.EqualFold(codec.Name, codecName) {
 			codecs = append(codecs, codec)
 		}
 	}
