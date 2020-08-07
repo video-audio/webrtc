@@ -24,14 +24,13 @@ type SettingEngine struct {
 		DataChannels bool
 	}
 	timeout struct {
-		ICEDisconnectedTimeout       *time.Duration
-		ICEFailedTimeout             *time.Duration
-		ICEKeepaliveInterval         *time.Duration
-		ICECandidateSelectionTimeout *time.Duration
-		ICEHostAcceptanceMinWait     *time.Duration
-		ICESrflxAcceptanceMinWait    *time.Duration
-		ICEPrflxAcceptanceMinWait    *time.Duration
-		ICERelayAcceptanceMinWait    *time.Duration
+		ICEDisconnectedTimeout    *time.Duration
+		ICEFailedTimeout          *time.Duration
+		ICEKeepaliveInterval      *time.Duration
+		ICEHostAcceptanceMinWait  *time.Duration
+		ICESrflxAcceptanceMinWait *time.Duration
+		ICEPrflxAcceptanceMinWait *time.Duration
+		ICERelayAcceptanceMinWait *time.Duration
 	}
 	candidates struct {
 		ICELite                        bool
@@ -57,6 +56,7 @@ type SettingEngine struct {
 	disableSRTCPReplayProtection              bool
 	vnet                                      *vnet.Net
 	LoggerFactory                             logging.LoggerFactory
+	iceTCPMux                                 ice.TCPMux
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -74,11 +74,6 @@ func (e *SettingEngine) SetICETimeouts(disconnectedTimeout, failedTimeout, keepA
 	e.timeout.ICEDisconnectedTimeout = &disconnectedTimeout
 	e.timeout.ICEFailedTimeout = &failedTimeout
 	e.timeout.ICEKeepaliveInterval = &keepAliveInterval
-}
-
-// SetCandidateSelectionTimeout sets the max ICECandidateSelectionTimeout
-func (e *SettingEngine) SetCandidateSelectionTimeout(t time.Duration) {
-	e.timeout.ICECandidateSelectionTimeout = &t
 }
 
 // SetHostAcceptanceMinWait sets the ICEHostAcceptanceMinWait
@@ -246,6 +241,12 @@ func (e *SettingEngine) DisableSRTCPReplayProtection(isDisabled bool) {
 // some webrtc implementations.
 func (e *SettingEngine) SetSDPMediaLevelFingerprints(sdpMediaLevelFingerprints bool) {
 	e.sdpMediaLevelFingerprints = sdpMediaLevelFingerprints
+}
+
+// SetICETCPMux enables ICE-TCP when set to a non-nil value. Make sure that
+// NetworkTypeTCP4 or NetworkTypeTCP6 is enabled as well.
+func (e *SettingEngine) SetICETCPMux(tcpMux ice.TCPMux) {
+	e.iceTCPMux = tcpMux
 }
 
 // AddSDPExtensions adds available and offered extensions for media type.

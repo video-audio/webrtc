@@ -253,9 +253,11 @@ a=sctpmap:5000 webrtc-datachannel 1024
 
 func TestSetRemoteDescription(t *testing.T) {
 	testCases := []struct {
-		desc SessionDescription
+		desc        SessionDescription
+		expectError bool
 	}{
-		{SessionDescription{Type: SDPTypeOffer, SDP: minimalOffer}},
+		{SessionDescription{Type: SDPTypeOffer, SDP: minimalOffer}, false},
+		{SessionDescription{Type: 0, SDP: ""}, true},
 	}
 
 	for i, testCase := range testCases {
@@ -264,8 +266,10 @@ func TestSetRemoteDescription(t *testing.T) {
 			t.Errorf("Case %d: got error: %v", i, err)
 		}
 
-		if err = peerConn.SetRemoteDescription(testCase.desc); err != nil {
-			t.Errorf("Case %d: got error: %v", i, err)
+		if testCase.expectError {
+			assert.Error(t, peerConn.SetRemoteDescription(testCase.desc))
+		} else {
+			assert.NoError(t, peerConn.SetRemoteDescription(testCase.desc))
 		}
 
 		assert.NoError(t, peerConn.Close())
@@ -274,35 +278,25 @@ func TestSetRemoteDescription(t *testing.T) {
 
 func TestCreateOfferAnswer(t *testing.T) {
 	offerPeerConn, err := NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Errorf("New PeerConnection: got error: %v", err)
-	}
-	offer, err := offerPeerConn.CreateOffer(nil)
-	if err != nil {
-		t.Errorf("Create Offer: got error: %v", err)
-	}
-	if err = offerPeerConn.SetLocalDescription(offer); err != nil {
-		t.Errorf("SetLocalDescription: got error: %v", err)
-	}
+	assert.NoError(t, err)
+
 	answerPeerConn, err := NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Errorf("New PeerConnection: got error: %v", err)
-	}
-	err = answerPeerConn.SetRemoteDescription(offer)
-	if err != nil {
-		t.Errorf("SetRemoteDescription: got error: %v", err)
-	}
+	assert.NoError(t, err)
+
+	_, err = offerPeerConn.CreateDataChannel("test-channel", nil)
+	assert.NoError(t, err)
+
+	offer, err := offerPeerConn.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, offerPeerConn.SetLocalDescription(offer))
+
+	assert.NoError(t, answerPeerConn.SetRemoteDescription(offer))
+
 	answer, err := answerPeerConn.CreateAnswer(nil)
-	if err != nil {
-		t.Errorf("Create Answer: got error: %v", err)
-	}
-	if err = answerPeerConn.SetLocalDescription(answer); err != nil {
-		t.Errorf("SetLocalDescription: got error: %v", err)
-	}
-	err = offerPeerConn.SetRemoteDescription(answer)
-	if err != nil {
-		t.Errorf("SetRemoteDescription (Originator): got error: %v", err)
-	}
+	assert.NoError(t, err)
+
+	assert.NoError(t, answerPeerConn.SetLocalDescription(answer))
+	assert.NoError(t, offerPeerConn.SetRemoteDescription(answer))
 
 	assert.NoError(t, offerPeerConn.Close())
 	assert.NoError(t, answerPeerConn.Close())
